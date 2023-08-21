@@ -5,8 +5,11 @@ import Product from "./pages/Product/Product.jsx";
 import Login from "./pages/Login/Login.jsx";
 import Register from "./pages/Register/Register.jsx";
 import Cart from "./pages/Cart/Cart.jsx";
+import Success from "./pages/Success/Success.jsx";
+import { useSelector } from "react-redux";
 
 const MainRouter = () => {
+  const user = useSelector(state => state.user.currentUser);
   return useRoutes(
     [
       {
@@ -15,23 +18,27 @@ const MainRouter = () => {
       },
       {
         element: <ProductList />,
-        path: '/productlist',
+        path: '/products/:category',
       },
       {
         element: <Product />,
-        path: '/product',
+        path: '/product/:id',
       },
-      {
-        element: <Login />,
+      // { element: <Login />,
+      { element: user ? <Home /> : <Login />,
         path: '/login',
       },
       {
-        element: <Register />,
+        element: user ? <Home /> : <Register />,
         path: '/register',
       },
       {
         element: <Cart />,
         path: '/cart',
+      },
+      {
+        element: <Success />,
+        path: '/success',
       }
     ]
   )

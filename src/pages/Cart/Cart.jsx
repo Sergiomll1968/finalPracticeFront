@@ -1,9 +1,16 @@
-import { styled } from "styled-components";
-import NavBar from "../../components/NavBar/NavBar";
-import Announcement from "../../components/Announcement/Announcement";
-import Footer from "../../components/Footer/Footer";
-import { Add, Remove } from "@mui/icons-material";
+import { styled } from 'styled-components';
+import NavBar from '../../components/NavBar/NavBar';
+import Announcement from '../../components/Announcement/Announcement';
+import Footer from '../../components/Footer/Footer';
+import { Add, Remove } from '@mui/icons-material';
 import { mobile } from '../../responsive.js';
+import { useSelector } from 'react-redux';
+import StripeCheckout from 'react-stripe-checkout';
+import { useEffect, useState } from 'react';
+import { userRequest } from '../../fetchData.js';
+import { useNavigate } from 'react-router-dom';
+
+const STRIPE_PUBLISH_KEY = 'pk_test_51NebxUIgW4AIHvIxmBeQAET8VHUMnXkuokbbK0h9RW18yuDMpRaqAHVYtpFdqddQCKtrzkLUunJqWrj8gA3akJF000rJUUIPeA'
 
 const Container = styled.div`
   
@@ -155,67 +162,83 @@ const Button = styled.button`
 `;
 
 const Cart = () => {
+  const cart = useSelector(state => state.cart);
+  const [stripeToken, setStripeToken] = useState(null);
+  const navigate = useNavigate();
+
+  const onToken = (token) => {
+    setStripeToken(token);
+  }
+
+  useEffect(() => {
+    const makeRequest = async () =>{
+      try {
+        const res = await userRequest.post('/payments/stripe', {
+          tokenId: stripeToken.id,
+          amount: cart.total * 100,
+        });
+        navigate('/success', {
+          stripeData: res.data,
+          products: cart});
+      } catch (error) {
+        console.log(error);
+      }
+    }
+    stripeToken && cart.total >=1 && makeRequest();
+  },[stripeToken, cart.total, history])
+
   return (
     <Container>
       <Announcement/>
       <NavBar/>
         <Wrapper>
-          <Title>TU CARRITO</Title>
+          <Title>YOUR BAG</Title>
           <Top>
-            <TopButton>SEGUIR COMPRANDO</TopButton>
+            <TopButton>CONTINUE SHOPPING</TopButton>
             <TopTexts>
-              <TopText>Carrito de compra (2)</TopText>
-              <TopText>Tu lista de deseos (0)</TopText>
+              <TopText>Shopping Bag(2)</TopText>
+              <TopText>Your Wishlist (0)</TopText>
             </TopTexts>
-            <TopButton type='filled'>COMPROBAR PEDIDO</TopButton>
+            <TopButton type='filled'>CHECKOUT NOW</TopButton>
           </Top>
           <Bottom>
             <Info>
-              <Product>
-                <ProductDetail>
-                  <Image src='https://hips.hearstapps.com/vader-prod.s3.amazonaws.com/1614188818-TD1MTHU_SHOE_ANGLE_GLOBAL_MENS_TREE_DASHERS_THUNDER_b01b1013-cd8d-48e7-bed9-52db26515dc4.png?crop=1xw:1.00xh;center,top&resize=480%3A%2A'/>
-                  <Details>
-                    <ProductName><b>Product:</b> JESSIE THUNDER SHOES</ProductName>
-                    <ProductId><b>ID:</b> 93813718293</ProductId>
-                    <ProductColor color='black'/>
-                    <ProductSize><b>Size:</b> 37.5</ProductSize>
-                  </Details>
-                </ProductDetail>
-                <PriceDetail>
-                  <ProductAmountContainer>
-                    <Add/>
-                    <ProductAmount>2</ProductAmount>
-                    <Remove/>
-                  </ProductAmountContainer>
-                  <ProductPrice>30 €</ProductPrice>
-                </PriceDetail>
-              </Product>
+              {cart.products.map(product => (
+                  <Product key={product.id}>
+                    <ProductDetail>
+                      <Image src={product.img}/>
+                      <Details>
+                        <ProductName>
+                          <b>Product:</b> {product.title}
+                        </ProductName>
+                        <ProductId>
+                          <b>ID:</b> {product.id}
+                        </ProductId>
+                        <ProductColor color={product.color}/>
+                        <ProductSize>
+                          <b>Size:</b> {product.size}
+                        </ProductSize>
+                      </Details>
+                    </ProductDetail>
+                    <PriceDetail>
+                      <ProductAmountContainer>
+                        <Add/>
+                        <ProductAmount>{product.quantity}</ProductAmount>
+                        <Remove/>
+                      </ProductAmountContainer>
+                      <ProductPrice>{product.price * product.quantity} €</ProductPrice>
+                    </PriceDetail>
+                  </Product>
+                ))
+              }
               <Hr/>
-              <Product>
-                <ProductDetail>
-                  <Image src='https://i.pinimg.com/originals/2d/af/f8/2daff8e0823e51dd752704a47d5b795c.png'/>
-                  <Details>
-                    <ProductName><b>Product:</b> HAKURA T-SHIRT</ProductName>
-                    <ProductId><b>ID:</b> 93813718293</ProductId>
-                    <ProductColor color='gray'/>
-                    <ProductSize><b>Size:</b> M</ProductSize>
-                  </Details>
-                </ProductDetail>
-                <PriceDetail>
-                  <ProductAmountContainer>
-                    <Add/>
-                    <ProductAmount>2</ProductAmount>
-                    <Remove/>
-                  </ProductAmountContainer>
-                  <ProductPrice>20 €</ProductPrice>
-                </PriceDetail>
-              </Product>
+
             </Info>
             <Summary>
               <SummaryTitle>Resumen del pedido</SummaryTitle>
               <SummaryItem>
                 <SummaryItemText>Subtotal</SummaryItemText>
-                <SummaryItemPrice>80 €</SummaryItemPrice>
+                <SummaryItemPrice>{cart.total} €</SummaryItemPrice>
               </SummaryItem>
               <SummaryItem>
                 <SummaryItemText>Envío estimado</SummaryItemText>
@@ -227,9 +250,20 @@ const Cart = () => {
               </SummaryItem>
               <SummaryItem type='total'>
                 <SummaryItemText>Total</SummaryItemText>
-                <SummaryItemPrice>80 €</SummaryItemPrice>
+                <SummaryItemPrice>{cart.total} €</SummaryItemPrice>
               </SummaryItem>
-              <Button>COMPROBAR PEDIDO</Button>
+              <StripeCheckout
+                name="SMF Shop"
+                image='../../public.logo.png'
+                billingAddress
+                shippingAddress
+                description={`Your total is ${cart.total}€`}
+                amount={cart.total * 100}
+                token={onToken}
+                stripeKey={STRIPE_PUBLISH_KEY}
+              >
+                <Button>CHECKOUT NOW</Button>
+              </StripeCheckout>
             </Summary>
           </Bottom>
         </Wrapper>
